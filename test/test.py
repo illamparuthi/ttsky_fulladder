@@ -5,16 +5,16 @@ from cocotb.triggers import Timer
 async def test_full_adder(dut):
     dut._log.info("Starting Gate-Level Hardened Simulation...")
 
-    # 1. Initialize all inputs to avoid 'X' propagation
+    # 1. Force all inputs to 0 to prevent 'X' propagation from the start
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     
-    # 2. Longer Reset: Give the netlist more time to stabilize
+    # 2. Strong Reset: GL netlists often need more time to clear 'X' states
     dut.rst_n.value = 0
-    await Timer(20, units="ns") 
+    await Timer(50, units="ns") 
     dut.rst_n.value = 1
-    await Timer(20, units="ns") 
+    await Timer(50, units="ns") 
 
     # Define Test Cases: (A, B, Cin) -> (Expected Sum, Expected Cout)
     test_cases = [
@@ -26,17 +26,16 @@ async def test_full_adder(dut):
     ]
 
     for a, b, cin, e_sum, e_cout in test_cases:
-        # Pack inputs into the 8-bit ui_in bus
+        # Pack inputs: A=bit0, B=bit1, Cin=bit2
         dut.ui_in.value = (cin << 2) | (b << 1) | a
         
-        # 3. Increased Propagation Delay: 
-        # 1ns is often too short for gate-level timing. 10ns is safer.
-        await Timer(10, units="ns")
+        # 3. Propagation Delay: 
+        # GL timing is not instant like RTL. 20ns allows signal settle time.
+        await Timer(20, units="ns")
 
-        # 4. Robust Conversion:
-        # We use .integer to try and get the value, but catch the error if it's 'X'
+        # 4. Safe Conversion:
+        # We catch the ValueError to provide better debugging for students
         try:
-            # We use bitwise masking on the full value to be safe
             output_val = int(dut.uo_out.value)
             actual_sum = output_val & 1
             actual_cout = (output_val >> 1) & 1
@@ -48,6 +47,6 @@ async def test_full_adder(dut):
             dut._log.info(f"Input: {a},{b},{cin} -> Sum: {actual_sum}, Cout: {actual_cout} [PASS]")
             
         except ValueError:
-            # If signals are still 'X', this will print the binary string for debugging
-            dut._log.error(f"Logic error at Input {a},{b},{cin}: uo_out contains 'X' or 'Z' -> {dut.uo_out.value.binstr}")
+            # This triggers if uo_out still contains 'X' or 'Z'
+            dut._log.error(f"GL Error at Input {a},{b},{cin}: uo_out is {dut.uo_out.value.binstr}")
             raise
