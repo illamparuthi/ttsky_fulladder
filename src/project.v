@@ -25,9 +25,12 @@ module tt_um_full_adder (
     assign uo_out[0] = sum;
     assign uo_out[1] = cout;
 
-    // 4. Tie off unused pins to prevent floating signals
+    // 4. Grounding unused outputs to prevent floating nodes
     assign uo_out[7:2] = 6'b000000;
     assign uio_out     = 8'b00000000;
     assign uio_oe      = 8'b00000000;
+
+    // Dummy wire to handle unused control pins for linting
+    wire _unused = &{clk, rst_n, ena, uio_in};
 
 endmodule
