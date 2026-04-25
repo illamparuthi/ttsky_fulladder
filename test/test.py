@@ -5,48 +5,44 @@ from cocotb.triggers import Timer
 async def test_full_adder(dut):
     dut._log.info("Starting Gate-Level Hardened Simulation...")
 
-    # 1. Force all inputs to 0 to prevent 'X' propagation from the start
+    # 1. Initialize inputs
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     
-    # 2. Strong Reset: GL netlists often need more time to clear 'X' states
+    # 2. Reset Sequence: 50ns is recommended for GL netlist stability
     dut.rst_n.value = 0
-    await Timer(50, units="ns") 
+    await Timer(50, unit="ns") 
     dut.rst_n.value = 1
-    await Timer(50, units="ns") 
+    await Timer(50, unit="ns") 
 
     # Define Test Cases: (A, B, Cin) -> (Expected Sum, Expected Cout)
     test_cases = [
         (0, 0, 0, 0, 0),
-        (1, 0, 0, 1, 0),
-        (0, 1, 0, 1, 0),
         (1, 1, 0, 0, 1),
         (1, 1, 1, 1, 1),
+        (1, 0, 0, 1, 0),
+        (0, 1, 0, 1, 0),
     ]
 
     for a, b, cin, e_sum, e_cout in test_cases:
-        # Pack inputs: A=bit0, B=bit1, Cin=bit2
         dut.ui_in.value = (cin << 2) | (b << 1) | a
         
-        # 3. Propagation Delay: 
-        # GL timing is not instant like RTL. 20ns allows signal settle time.
-        await Timer(20, units="ns")
+        # 3. Propagation Delay: Allow gates time to settle
+        await Timer(20, unit="ns")
 
-        # 4. Safe Conversion:
-        # We catch the ValueError to provide better debugging for students
+        # 4. Safe Conversion
         try:
             output_val = int(dut.uo_out.value)
             actual_sum = output_val & 1
             actual_cout = (output_val >> 1) & 1
             
-            # Verify results
-            assert actual_sum == e_sum, f"Failed Sum: A={a} B={b} Cin={cin} | Got {actual_sum}"
-            assert actual_cout == e_cout, f"Failed Cout: A={a} B={b} Cin={cin} | Got {actual_cout}"
+            assert actual_sum == e_sum, f"Sum Error: A={a} B={b} Cin={cin}"
+            assert actual_cout == e_cout, f"Cout Error: A={a} B={b} Cin={cin}"
             
             dut._log.info(f"Input: {a},{b},{cin} -> Sum: {actual_sum}, Cout: {actual_cout} [PASS]")
             
         except ValueError:
-            # This triggers if uo_out still contains 'X' or 'Z'
-            dut._log.error(f"GL Error at Input {a},{b},{cin}: uo_out is {dut.uo_out.value.binstr}")
+            # Helps debug 'X' states in the GitHub Action logs
+            dut._log.error(f"Logic error: uo_out is {str(dut.uo_out.value)}")
             raise
