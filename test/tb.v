@@ -3,12 +3,14 @@
 
 module tb ();
 
+    // Dump signals for GTKWave
     initial begin
         $dumpfile ("tb.vcd");
         $dumpvars (0, tb);
         #1;
     end
 
+    // Standard Signal definitions
     reg  clk;
     reg  rst_n;
     reg  ena;
@@ -18,10 +20,18 @@ module tb ();
     wire [7:0] uio_out;
     wire [7:0] uio_oe;
 
+    // 1. Declare explicit nets for power to satisfy 'inout' port rules
+`ifdef GL_TEST
+    wire VPWR = 1'b1;
+    wire VGND = 1'b0;
+`endif
+
+    // Instantiate the design under test (DUT)
     tt_um_full_adder user_project (
 `ifdef GL_TEST
-        .VPWR(1'b1), // Power pin for Gate-Level simulation
-        .VGND(1'b0), // Ground pin for Gate-Level simulation
+        // 2. Connect the defined nets instead of hardcoded constants
+        .VPWR(VPWR),
+        .VGND(VGND),
 `endif
         .ui_in   (ui_in),
         .uo_out  (uo_out),
